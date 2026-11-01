@@ -1,25 +1,452 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-
-    <!-- CSS -->
-    <style>
-        body {
-            background: #f3f5f9;
-            font-family: Arial;
-        }
-    </style>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perodua JB1 Attendance Board</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f5f9;color:#202b3c}
+header{background:#172b4d;color:white;padding:22px 28px}
+header h1{margin:0;font-size:25px}
+header p{margin:6px 0 0;color:#cbd5e1}
+.container{max-width:1400px;margin:auto;padding:24px}
+.dashboard{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:22px}
+.stat,.department,.panel{background:white;padding:20px;border-radius:12px;box-shadow:0 2px 8px #0000000a}
+.stat small{color:#64748b}
+.stat h2{margin:8px 0 0;font-size:28px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+input,select,button{font:inherit;padding:10px 12px;border:1px solid #d7deea;border-radius:7px}
+input,select{background:white}
+button{cursor:pointer;border:0;background:#1d4ed8;color:white;font-weight:bold}
+button:hover{opacity:.88}
+button.secondary{background:#64748b}
+button.danger{background:#dc2626}
+button.success{background:#15803d}
+.department-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.department{padding:17px}
+.department h3{margin:0 0 15px;font-size:16px;display:flex;justify-content:space-between}
+.staff-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid #edf0f5}
+.staff-name{font-size:14px;font-weight:600}
+.staff-actions{display:flex;align-items:center;gap:6px}
+.staff-actions button{padding:5px 8px;font-size:11px}
+.status{border-radius:20px;padding:5px 9px;font-size:11px;font-weight:bold;background:#dcfce7;color:#166534;white-space:nowrap}
+.status.AL,.status.OD,.status.MC,.status.EL,.status.CL,.status.CP,.status.CT,.status.MIA{background:#fee2e2;color:#991b1b}
+.status.LEWAT{background:#fef3c7;color:#92400e}
+.panel{margin-top:22px}
+.panel h2{margin-top:0}
+.history-list{height:260px;overflow-y:auto;overflow-x:hidden;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px}
+.history-item{padding:12px 5px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.history-item:last-child{border-bottom:none}
+.history-item small{color:#64748b}
+.modal{display:none;position:fixed;inset:0;background:#0009;align-items:center;justify-content:center;padding:15px;z-index:10}
+.modal-content{background:white;width:100%;max-width:400px;padding:24px;border-radius:12px}
+.modal-content input,.modal-content select{width:100%;margin:7px 0 14px}
+.modal-content button{margin-right:5px}
+#loginScreen{position:fixed;inset:0;z-index:20;background:#172b4d;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:white;padding:30px;border-radius:14px;width:100%;max-width:360px;text-align:center}
+.login-box input{width:100%;margin:15px 0}
+.login-box button{width:100%}
+#error{color:#dc2626;font-size:13px}
+@media(max-width:900px){.department-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){
+.container{padding:14px}
+.dashboard,.department-grid{grid-template-columns:1fr}
+header{padding:18px}
+.toolbar>*{width:100%}
+.history-item{align-items:flex-start}
+}
+</style>
 </head>
-
 <body>
 
-    <h1>Attendance Board</h1>
+<div id="loginScreen">
+ <div class="login-box">
+  <h1>ATTENDANCE</h1>
+  <h2>Perodua Johor Bahru 1 - Tampoi</h2>
+  <p>pass: adminjb1</p>
+  <input type="password" id="password" placeholder="Enter password">
+  <button onclick="login()">Login</button>
+  <p id="error"></p>
+ </div>
+</div>
 
-    <!-- JavaScript -->
-    <script>
-        alert("Welcome!");
-    </script>
+<header>
+ <h1>Attendance Board</h1>
+ <p>Perodua Johor Bahru 1 Tampoi</p>
+</header>
 
+<div class="container">
+ <div class="dashboard">
+  <div class="stat"><small>Total Staff</small><h2 id="totalStaff">41</h2></div>
+  <div class="stat"><small>Absent Staff</small><h2 id="absentCount">0</h2></div>
+  <div class="stat">
+   <small>Attendance Rate</small>
+   <h2 id="attendanceRate">100%</h2>
+   <small id="attendanceCaption">41 of 41 staff present</small>
+  </div>
+ </div>
+
+ <div class="toolbar">
+  <input type="date" id="attendanceDate">
+  <input type="text" id="search" placeholder="Search staff..." oninput="render()">
+  <select id="filter" onchange="render()">
+   <option value="ALL">All Status</option>
+   <option value="PRESENT">Present</option>
+   <option value="AL">AL</option>
+   <option value="OD">OD</option>
+   <option value="MC">MC</option>
+   <option value="EL">EL</option>
+   <option value="CL">CL</option>
+   <option value="TR">TR</option>
+   <option value="UP">UP</option>
+   <option value="MIA">MIA</option>
+   <option value="OTHERS">OTHERS</option>
+  </select>
+  <button class="success" onclick="saveDay()">Save Attendance</button>
+  <button onclick="newDay()">New Day</button>
+  <button class="secondary" onclick="exportCSV()">Export CSV</button>
+ </div>
+
+ <div id="departmentGrid" class="department-grid"></div>
+
+ <div class="panel">
+  <h2>Attendance History</h2>
+  <div id="historyList" class="history-list"></div>
+ </div>
+</div>
+
+<div class="modal" id="staffModal">
+ <div class="modal-content">
+  <h2 id="modalTitle">Add Staff</h2>
+  <label>Staff Name</label>
+  <input id="staffName" placeholder="Enter staff name">
+  <label>Department</label>
+  <select id="staffDepartment"></select>
+  <label>Status</label>
+  <select id="staffStatus">
+   <option value="">Present</option>
+   <option value="AL">AL</option>
+   <option value="OD">OD</option>
+   <option value="MC">MC</option>
+   <option value="EL">EL</option>
+   <option value="CL">CL</option>
+   <option value="TR">TR</option>
+   <option value="UP">UP</option>
+   <option value="MIA">MIA</option>
+   <option value="OTHERS">OTHERS</option>
+  </select>
+  <button onclick="saveStaff()">Save</button>
+  <button class="secondary" onclick="closeModal()">Cancel</button>
+ </div>
+</div>
+
+<script>
+const TOTAL_STAFF=41;
+const PASSWORD="adminjb1";
+
+const departments={
+ "Service Manager":[],
+ "Executive":[
+  {name:"Rizal",status:"MC"},
+  {name:"Kak D",status:"1/2 AL"}
+ ],
+ "Admin":[],
+ "B&P":[],
+ "Service Advisor":[],
+ "Sparepart":[
+  {name:"Nik Azman",status:""}
+ ],
+ "Foreman":[
+  {name:"Anwar",status:"AL"},
+  {name:"Lan",status:"OD"}
+ ],
+ "Service Technician":[
+  {name:"Syazwan",status:"AL"}
+ ]
+};
+
+let editing=null;
+const absentStatuses=["AL","OD","MC","EL","CL","TR","UP","MIA","OTHERS"];
+
+function login(){
+ const password=document.getElementById("password").value;
+ if(password===PASSWORD){
+  sessionStorage.setItem("attendanceUnlocked","true");
+  document.getElementById("loginScreen").style.display="none";
+ }else{
+  document.getElementById("error").textContent="Incorrect password. Please try again.";
+ }
+}
+
+if(sessionStorage.getItem("attendanceUnlocked")==="true"){
+ document.getElementById("loginScreen").style.display="none";
+}
+
+document.getElementById("password").addEventListener("keydown",e=>{
+ if(e.key==="Enter")login();
+});
+
+function getAbsentCount(){
+ let count=0;
+ Object.values(departments).forEach(list=>{
+  list.forEach(staff=>{
+   if(absentStatuses.includes(staff.status))count++;
+  });
+ });
+ return count;
+}
+
+function updateStats(){
+ const absent=getAbsentCount();
+ const present=Math.max(0,TOTAL_STAFF-absent);
+ const rate=(present/TOTAL_STAFF)*100;
+ document.getElementById("totalStaff").textContent=TOTAL_STAFF;
+ document.getElementById("absentCount").textContent=absent;
+ document.getElementById("attendanceRate").textContent=rate.toFixed(1)+"%";
+ document.getElementById("attendanceCaption").textContent=present+" of "+TOTAL_STAFF+" staff present";
+}
+
+function render(){
+ const grid=document.getElementById("departmentGrid");
+ const search=document.getElementById("search").value.toLowerCase();
+ const filter=document.getElementById("filter").value;
+ grid.innerHTML="";
+
+ Object.entries(departments).forEach(([department,staffList])=>{
+  const card=document.createElement("div");
+  card.className="department";
+
+  const title=document.createElement("h3");
+  title.innerHTML=`<span>${department}</span><span>${staffList.length}</span>`;
+  card.appendChild(title);
+
+  staffList.forEach((staff,index)=>{
+   const matchesSearch=staff.name.toLowerCase().includes(search);
+   const isAbsent=absentStatuses.includes(staff.status);
+   const matchesFilter=filter==="ALL"||
+    (filter==="PRESENT"&&!isAbsent)||staff.status===filter;
+
+   if(!matchesSearch||!matchesFilter)return;
+
+   const row=document.createElement("div");
+   row.className="staff-row";
+
+   const name=document.createElement("span");
+   name.className="staff-name";
+   name.textContent=staff.name;
+
+   const actions=document.createElement("div");
+   actions.className="staff-actions";
+
+   const badge=document.createElement("span");
+   badge.className="status "+(staff.status||"");
+   badge.textContent=staff.status||"PRESENT";
+
+   const editBtn=document.createElement("button");
+   editBtn.textContent="Edit";
+   editBtn.onclick=()=>openModal(department,index);
+
+   const deleteBtn=document.createElement("button");
+   deleteBtn.textContent="×";
+   deleteBtn.className="danger";
+   deleteBtn.onclick=()=>deleteStaff(department,index);
+
+   actions.append(badge,editBtn,deleteBtn);
+   row.append(name,actions);
+   card.appendChild(row);
+  });
+
+  const addBtn=document.createElement("button");
+  addBtn.textContent="+ Add Staff";
+  addBtn.className="secondary";
+  addBtn.style.marginTop="12px";
+  addBtn.onclick=()=>openModal(department);
+  card.appendChild(addBtn);
+  grid.appendChild(card);
+ });
+ updateStats();
+}
+
+function openModal(department,index=null){
+ editing=index===null?null:{department,index};
+ document.getElementById("modalTitle").textContent=editing?"Edit Staff":"Add Staff";
+
+ const select=document.getElementById("staffDepartment");
+ select.innerHTML="";
+ Object.keys(departments).forEach(name=>{
+  const option=document.createElement("option");
+  option.value=name;
+  option.textContent=name;
+  select.appendChild(option);
+ });
+
+ if(editing){
+  const staff=departments[department][index];
+  document.getElementById("staffName").value=staff.name;
+  select.value=department;
+  document.getElementById("staffStatus").value=staff.status;
+ }else{
+  document.getElementById("staffName").value="";
+  select.value=department;
+  document.getElementById("staffStatus").value="";
+ }
+ document.getElementById("staffModal").style.display="flex";
+}
+
+function closeModal(){
+ document.getElementById("staffModal").style.display="none";
+}
+
+function saveStaff(){
+ const name=document.getElementById("staffName").value.trim();
+ const department=document.getElementById("staffDepartment").value;
+ const status=document.getElementById("staffStatus").value;
+ if(!name){alert("Please enter staff name.");return;}
+
+ if(editing){
+  const oldDepartment=editing.department;
+  const oldIndex=editing.index;
+  if(oldDepartment===department){
+   departments[department][oldIndex]={name,status};
+  }else{
+   departments[oldDepartment].splice(oldIndex,1);
+   departments[department].push({name,status});
+  }
+ }else{
+  departments[department].push({name,status});
+ }
+ closeModal();
+ render();
+}
+
+function deleteStaff(department,index){
+ if(confirm("Are you sure you want to delete this staff?")){
+  departments[department].splice(index,1);
+  render();
+ }
+}
+
+function saveDay(){
+ const date=document.getElementById("attendanceDate").value;
+ if(!date){alert("Please select a date.");return;}
+
+ const absent=getAbsentCount();
+ const present=Math.max(0,TOTAL_STAFF-absent);
+ const rate=(present/TOTAL_STAFF)*100;
+
+ const record={
+  date,absent,present,rate:rate.toFixed(1),
+  departments:JSON.parse(JSON.stringify(departments))
+ };
+
+ let history=JSON.parse(localStorage.getItem("attendanceHistory")||"[]");
+ history=history.filter(item=>item.date!==date);
+ history.push(record);
+ history.sort((a,b)=>b.date.localeCompare(a.date));
+ localStorage.setItem("attendanceHistory",JSON.stringify(history));
+ renderHistory();
+ alert("Attendance saved successfully!");
+}
+
+function renderHistory(){
+ const list=document.getElementById("historyList");
+ const history=JSON.parse(localStorage.getItem("attendanceHistory")||"[]");
+ list.innerHTML="";
+
+ if(history.length===0){
+  list.textContent="No attendance history yet.";
+  return;
+ }
+
+ history.forEach(record=>{
+  const item=document.createElement("div");
+  item.className="history-item";
+
+  const info=document.createElement("div");
+  const date=document.createElement("strong");
+  date.textContent=record.date;
+  const detail=document.createElement("small");
+  detail.textContent=record.present+" present · "+record.absent+" absent";
+  info.append(date,document.createElement("br"),detail);
+
+  const rate=document.createElement("strong");
+  rate.textContent=record.rate+"%";
+
+  const actions=document.createElement("div");
+  const viewBtn=document.createElement("button");
+  viewBtn.textContent="View";
+  viewBtn.onclick=()=>loadHistory(record.date);
+
+  const deleteBtn=document.createElement("button");
+  deleteBtn.textContent="Delete";
+  deleteBtn.className="danger";
+  deleteBtn.onclick=()=>deleteHistory(record.date);
+
+  actions.append(viewBtn,deleteBtn);
+  item.append(info,rate,actions);
+  list.appendChild(item);
+ });
+}
+
+function loadHistory(date){
+ const history=JSON.parse(localStorage.getItem("attendanceHistory")||"[]");
+ const record=history.find(item=>item.date===date);
+ if(!record)return;
+
+ Object.keys(departments).forEach(key=>delete departments[key]);
+ Object.entries(record.departments).forEach(([key,value])=>{
+  departments[key]=JSON.parse(JSON.stringify(value));
+ });
+
+ document.getElementById("attendanceDate").value=date;
+ render();
+ alert("Attendance history loaded.");
+}
+
+function deleteHistory(date){
+ if(!confirm("Delete this attendance history?"))return;
+ let history=JSON.parse(localStorage.getItem("attendanceHistory")||"[]");
+ history=history.filter(item=>item.date!==date);
+ localStorage.setItem("attendanceHistory",JSON.stringify(history));
+ renderHistory();
+}
+
+function newDay(){
+ if(!confirm("Start a new attendance day? This will clear current statuses."))return;
+ Object.values(departments).forEach(list=>{
+  list.forEach(staff=>staff.status="");
+ });
+ document.getElementById("attendanceDate").value=new Date().toISOString().slice(0,10);
+ render();
+}
+
+function exportCSV(){
+ const date=document.getElementById("attendanceDate").value;
+ let rows=[["Date","Department","Staff Name","Status"]];
+ Object.entries(departments).forEach(([department,list])=>{
+  list.forEach(staff=>{
+   rows.push([date,department,staff.name,staff.status||"PRESENT"]);
+  });
+ });
+
+ const csv=rows.map(row=>row.map(value=>
+  '"'+String(value).replace(/"/g,'""')+'"'
+ ).join(",")).join("\n");
+
+ const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+ const url=URL.createObjectURL(blob);
+ const link=document.createElement("a");
+ link.href=url;
+ link.download="attendance_"+(date||"export")+".csv";
+ link.click();
+ URL.revokeObjectURL(url);
+}
+
+document.getElementById("attendanceDate").value=new Date().toISOString().slice(0,10);
+render();
+renderHistory();
+</script>
 </body>
 </html>
